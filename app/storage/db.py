@@ -116,10 +116,19 @@ def delete_category(cat_id: int) -> None:
 # ===== Products =====
 
 def add_product(category_id: int, name: str, qty: float, limit_qty: float | None = None) -> None:
+    clean_name = name.strip()
+    qty_f = float(qty)
+    limit_f = None if limit_qty is None else float(limit_qty)
+
+    # Determine initial below_limit state
+    below_limit = 1 if (limit_f is not None and qty_f <= limit_f) else 0
+
     with connect() as con:
         con.execute(
-            "INSERT INTO products(category_id, name, qty, limit_qty, below_limit) VALUES (?, ?, ?, ?, 0)",
-            (int(category_id), name.strip(), float(qty), None if limit_qty is None else float(limit_qty)),
+            """INSERT INTO products (category_id, name, qty, limit_qty,below_limit)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (int(category_id), clean_name, qty_f, limit_f, below_limit),
         )
         con.commit()
 

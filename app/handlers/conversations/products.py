@@ -1,5 +1,5 @@
 import sqlite3
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -18,10 +18,23 @@ from app.services.notifications import maybe_notify_limit_crossed
 
 PROD_ADD_NAME = 10
 PROD_ADD_QTY = 11
+PROD_ADD_LIMIT = 12  # optional limit during product creation
 
 PROD_EDIT_NAME = 20
 PROD_EDIT_QTY = 30
 PROD_EDIT_LIMIT = 40
+
+
+def add_limit_keyboard() -> InlineKeyboardMarkup:
+    """
+    Inline keyboard for optional limit input during product creation.
+    - Skip: create product with limit_qty = NULL
+    - Cancel: use existing cancel handler
+    """
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭ Пропустити", callback_data="prod:add_limit_skip")],
+        [InlineKeyboardButton("❌ Скасувати", callback_data="prod:cancel")],
+    ])
 
 
 async def prod_add_from_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -57,13 +70,17 @@ async def prod_add_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return PROD_ADD_NAME
 
     context.user_data["prod_add_name"] = name
-    await update.message.reply_text("Введи кількість (наприклад 2 або 2.5):", reply_markup=cancel_keyboard("prod"))
+    await update.message.reply_text(
+        "Введи кількість (наприклад 2 або 2.5):",
+        reply_markup=cancel_keyboard("prod"),
+    )
     return PROD_ADD_QTY
 
 
 async def prod_add_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Persist a new product into DB.
+    Collect product quantity for the add flow.
+    After qty is valid, ask for optional limit (can be skipped).
     """
     cat_id = context.user_data.get("prod_add_cat_id")
     name = context.user_data.get("prod_add_name")
@@ -77,8 +94,83 @@ async def prod_add_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Кількість має бути числом > 0. Приклад: 3 або 1.5. Введи ще раз:")
         return PROD_ADD_QTY
 
+    # Store qty and proceed to optional limit step
+    context.user_data["prod_add_qty"] = qty
+
+    await update.message.reply_text(
+        "Введи критичну кількість (не обов'язково).\n",
+        reply_markup=add_limit_keyboard(),
+    )
+    return PROD_ADD_LIMIT
+
+
+async def prod_add_limit_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Skip limit input during product creation (limit_qty = NULL).
+    """
+    q = update.callback_query
+    await q.answer()
+
+    cat_id = context.user_data.get("prod_add_cat_id")
+    name = context.user_data.get("prod_add_name")
+    qty = context.user_data.get("prod_add_qty")
+    if not cat_id or not name or qty is None:
+        await q.message.reply_text("Помилка стану. Відкрий категорію і натисни «Додати продукт».")
+        return ConversationHandler.END
+
     try:
-        db.add_product(int(cat_id), name, qty, None)
+        db.add_product(int(cat_id), name, float(qty), None)
+    except sqlite3.IntegrityError:
+        # Same behavior as before: if product name exists, ask for a new name
+        await q.message.reply_text(
+            "Такий продукт вже існує в цій категорії. Введи іншу назву:",
+            reply_markup=cancel_keyboard("prod"),
+        )
+        return PROD_ADD_NAME
+
+    # Cleanup temp state
+    context.user_data.pop("prod_add_cat_id", None)
+    context.user_data.pop("prod_add_name", None)
+    context.user_data.pop("prod_add_qty", None)
+
+    chat_id = q.message.chat_id
+    await q.message.reply_text(f"✅ Додано продукт: {name} — {qty}", reply_markup=bottom_kb(chat_id))
+    await show_products_as_reply(q.message, context, int(cat_id))
+    return ConversationHandler.END
+
+
+async def prod_add_limit_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Persist a new product with optional limit into DB.
+    User can enter:
+    - number > 0
+    - '-' or '0' to remove/skip the limit (store NULL)
+    """
+    cat_id = context.user_data.get("prod_add_cat_id")
+    name = context.user_data.get("prod_add_name")
+    qty = context.user_data.get("prod_add_qty")
+    if not cat_id or not name or qty is None:
+        await update.message.reply_text("Помилка стану. Відкрий категорію і натисни «Додати продукт».")
+        return ConversationHandler.END
+
+    # Allow "empty" logically (not required); in practice user can press Skip button
+    text = (update.message.text or "").strip()
+    if text == "":
+        limit_qty = None
+    else:
+        try:
+            limit_qty = parse_limit(text)  # supports '-', '0' => None
+        except Exception:
+            await update.message.reply_text(
+                "Ліміт має бути числом > 0.\n"
+                "Щоб прибрати ліміт — введи '-' або 0.\n"
+                "Або натисни «Пропустити».",
+                reply_markup=add_limit_keyboard(),
+            )
+            return PROD_ADD_LIMIT
+
+    try:
+        db.add_product(int(cat_id), name, float(qty), limit_qty)
     except sqlite3.IntegrityError:
         await update.message.reply_text(
             "Такий продукт вже існує в цій категорії. Введи іншу назву:",
@@ -86,11 +178,17 @@ async def prod_add_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return PROD_ADD_NAME
 
+    # Cleanup temp state
     context.user_data.pop("prod_add_cat_id", None)
     context.user_data.pop("prod_add_name", None)
+    context.user_data.pop("prod_add_qty", None)
 
     chat_id = update.effective_chat.id
-    await update.message.reply_text(f"✅ Додано продукт: {name} — {qty}", reply_markup=bottom_kb(chat_id))
+    added_msg = f"✅ Додано продукт: {name} — {qty}"
+    if limit_qty is not None:
+        added_msg += f" (ліміт: {limit_qty})"
+
+    await update.message.reply_text(added_msg, reply_markup=bottom_kb(chat_id))
     await show_products_as_reply(update.message, context, int(cat_id))
     return ConversationHandler.END
 
@@ -261,6 +359,10 @@ def register_product_conversations(app: Application) -> None:
         states={
             PROD_ADD_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, prod_add_name)],
             PROD_ADD_QTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, prod_add_qty)],
+            PROD_ADD_LIMIT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, prod_add_limit_value),
+                CallbackQueryHandler(prod_add_limit_skip, pattern=r"^prod:add_limit_skip$"),
+            ],
         },
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^(cat:cancel|prod:cancel)$")],
         allow_reentry=True,
