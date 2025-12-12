@@ -1,0 +1,63 @@
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
+
+from app.storage import db
+
+
+def bottom_kb(chat_id: int) -> ReplyKeyboardMarkup:
+    """
+    Build persistent bottom (reply) keyboard.
+    """
+    subscribed = db.is_subscriber(chat_id)
+    sub_btn = KeyboardButton("🔕 Відписатися") if subscribed else KeyboardButton("🔔 Підписатися")
+
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton("🏠 Категорії"), KeyboardButton("🔄 Оновити базу")],
+            [KeyboardButton("📝 Дозамовити"), sub_btn],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def categories_keyboard(rows):
+    """
+    Inline keyboard for categories list.
+    """
+    kb = [[InlineKeyboardButton("➕ Додати категорію", callback_data="cat:add")]]
+    for cat_id, name in rows:
+        kb.append([
+            InlineKeyboardButton(f"📦 {name}", callback_data=f"cat:open:{cat_id}"),
+            InlineKeyboardButton("✏️", callback_data=f"cat:edit:{cat_id}"),
+            InlineKeyboardButton("🗑️", callback_data=f"cat:del:{cat_id}"),
+        ])
+    return InlineKeyboardMarkup(kb)
+
+
+def products_keyboard(cat_id: int, products_rows):
+    """
+    Inline keyboard for products inside a category.
+    """
+    kb = [[InlineKeyboardButton("➕ Додати продукт", callback_data=f"prod:add:{cat_id}")]]
+    for prod_id, name, qty, limit_qty in products_rows:
+        limit_text = "—" if limit_qty is None else str(limit_qty)
+        kb.append([
+            InlineKeyboardButton(f"🏷️ {name}", callback_data=f"prod:rename:{prod_id}"),
+            InlineKeyboardButton(f"🔢 {qty}", callback_data=f"prod:qty:{prod_id}"),
+            InlineKeyboardButton(f"⚠️ {limit_text}", callback_data=f"prod:limit:{prod_id}"),
+            InlineKeyboardButton("🗑️", callback_data=f"prod:del:{prod_id}"),
+        ])
+
+    kb.append([InlineKeyboardButton("⬅️ Назад до категорій", callback_data="nav:cats")])
+    return InlineKeyboardMarkup(kb)
+
+
+def cancel_keyboard(prefix: str):
+    """
+    Inline cancel button used in conversation flows.
+    """
+    return InlineKeyboardMarkup([[InlineKeyboardButton("❌ Скасувати", callback_data=f"{prefix}:cancel")]])
