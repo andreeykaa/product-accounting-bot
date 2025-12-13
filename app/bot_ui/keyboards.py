@@ -31,18 +31,35 @@ def categories_keyboard(rows):
     kb = [[InlineKeyboardButton("➕ Додати категорію", callback_data="cat:add")]]
     for cat_id, name in rows:
         kb.append([
-            InlineKeyboardButton(f"📦 {name}", callback_data=f"cat:open:{cat_id}"),
-            InlineKeyboardButton("✏️", callback_data=f"cat:edit:{cat_id}"),
-            InlineKeyboardButton("🗑️", callback_data=f"cat:del:{cat_id}"),
+            InlineKeyboardButton(f"📦 {name}", callback_data=f"cat:open:{cat_id}")
         ])
     return InlineKeyboardMarkup(kb)
+
+
+def category_actions_keyboard(cat_id: int):
+    """
+    Build inline keyboard for category actions (rename/delete).
+    """
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✏️ Редагувати", callback_data=f"cat:edit:{cat_id}"),
+            InlineKeyboardButton("🗑️ Видалити", callback_data=f"cat:del:{cat_id}"),
+        ],
+        [
+            InlineKeyboardButton("⬅️ Назад", callback_data=f"cat:open:{cat_id}"),
+        ]
+    ])
 
 
 def products_keyboard(cat_id: int, products_rows):
     """
     Inline keyboard for products inside a category.
     """
-    kb = [[InlineKeyboardButton("➕ Додати продукт", callback_data=f"prod:add:{cat_id}")]]
+    kb = [[
+        InlineKeyboardButton("⚙️ Дії з категорією", callback_data=f"cat:actions:{cat_id}"),
+        InlineKeyboardButton("➕ Додати продукт", callback_data=f"prod:add:{cat_id}")
+    ]]
+
     for prod_id, name, qty, limit_qty in products_rows:
         limit_text = "—" if limit_qty is None else str(limit_qty)
         kb.append([

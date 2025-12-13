@@ -68,7 +68,7 @@ async def cat_edit_from_button(update: Update, context: ContextTypes.DEFAULT_TYP
     cat_id = int((q.data or "").split(":")[2])
     cat = db.get_category(cat_id)
     if not cat:
-        await q.message.reply_text("Категорію не знайдено (можливо видалена).")
+        await q.message.reply_text("Категорію не знайдено.")
         return ConversationHandler.END
 
     context.user_data["cat_edit_id"] = cat_id

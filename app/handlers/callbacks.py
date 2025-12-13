@@ -2,7 +2,9 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 
 from app.storage import db
-from app.bot_ui.screens import show_categories_as_edit, show_products_as_edit
+from app.bot_ui.screens import show_categories_as_edit, show_products_as_edit, safe_edit_message, \
+    show_categories_as_reply
+from app.bot_ui.keyboards import category_actions_keyboard
 
 
 async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -31,7 +33,7 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cat_id = int(parts[2])
         cat = db.get_category(cat_id)
         if not cat:
-            await q.message.reply_text("Категорію не знайдено (можливо видалена).")
+            await q.message.reply_text("Категорію не знайдено.")
             return
 
         kb = InlineKeyboardMarkup([[
@@ -44,8 +46,28 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(parts) == 3 and parts[0] == "cat" and parts[1] == "del_yes":
         cat_id = int(parts[2])
         db.delete_category(cat_id)
+
+        # don't edit old message text at all, just remove its keyboard
+        await safe_edit_message(q, text=q.message.text or " ", reply_markup=None)
+
         await q.message.reply_text("🗑️ Категорію видалено.")
-        await show_categories_as_edit(q, context)
+        await show_categories_as_reply(q.message, context)
+        return
+
+    if len(parts) == 3 and parts[0] == "cat" and parts[1] == "actions":
+        cat_id = int(parts[2])
+
+        cat = db.get_category(cat_id)
+        if not cat:
+            await q.message.reply_text("Категорію не знайдено.")
+            return
+
+        # Show actions menu for the category (edit message in-place)
+        await safe_edit_message(
+            q,
+            text=f"📦 Категорія: {cat[1]}",
+            reply_markup=category_actions_keyboard(cat_id),
+        )
         return
 
     # Product delete confirmation
@@ -53,7 +75,7 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         prod_id = int(parts[2])
         prod = db.get_product(prod_id)
         if not prod:
-            await q.message.reply_text("Продукт не знайдено (можливо вже видалений).")
+            await q.message.reply_text("Продукт не знайдено.")
             return
 
         _, cat_id, name, qty, _, _ = prod
@@ -87,5 +109,5 @@ def register_callback_handlers(app: Application) -> None:
     """
     app.add_handler(CallbackQueryHandler(
         callbacks,
-        pattern=r"^(nav:cats|cat:open:\d+|cat:del:\d+|cat:del_yes:\d+|prod:del:\d+|prod:del_yes:\d+)$"
+        pattern=r"^(nav:cats|cat:open:\d+|cat:actions:\d+|cat:del:\d+|cat:del_yes:\d+|prod:del:\d+|prod:del_yes:\d+)$"
     ))
