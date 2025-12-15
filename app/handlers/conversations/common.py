@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from app.bot_ui.keyboards import bottom_kb
-from app.bot_ui.screens import send_categories_reply, send_category_reply
+from app.bot_ui.screens import send_categories_reply, send_category_reply, send_product_reply
 
 
 async def on_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -15,6 +15,11 @@ async def on_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = q.message.chat.id
     await q.message.reply_text("Скасовано ✅", reply_markup=bottom_kb(chat_id))
 
+    active_prod_id = context.user_data.get("active_prod_id")
+    if active_prod_id:
+        await send_product_reply(q.message, context, int(active_prod_id))
+        return ConversationHandler.END
+
     active_cat_id = context.user_data.get("active_cat_id")
     if active_cat_id:
         await send_category_reply(q.message, context, int(active_cat_id))
@@ -22,3 +27,4 @@ async def on_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_categories_reply(q.message, context)
 
     return ConversationHandler.END
+
