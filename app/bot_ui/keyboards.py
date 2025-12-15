@@ -60,17 +60,31 @@ def products_keyboard(cat_id: int, products_rows):
         InlineKeyboardButton("➕ Додати продукт", callback_data=f"prod:add:{cat_id}")
     ]]
 
-    for prod_id, name, qty, limit_qty in products_rows:
-        limit_text = "—" if limit_qty is None else str(limit_qty)
-        kb.append([
-            InlineKeyboardButton(f"🏷️ {name}", callback_data=f"prod:rename:{prod_id}"),
-            InlineKeyboardButton(f"🔢 {qty}", callback_data=f"prod:qty:{prod_id}"),
-            InlineKeyboardButton(f"⚠️ {limit_text}", callback_data=f"prod:limit:{prod_id}"),
-            InlineKeyboardButton("🗑️", callback_data=f"prod:del:{prod_id}"),
-        ])
+    for prod_id, name, _, _ in products_rows:
+        kb.append([InlineKeyboardButton(f"🏷️ {name}", callback_data=f"prod:open:{prod_id}")])
 
     kb.append([InlineKeyboardButton("⬅️ Назад до категорій", callback_data="nav:cats")])
     return InlineKeyboardMarkup(kb)
+
+
+def product_view_keyboard(prod_id: int, cat_id: int, qty: float, limit_qty: float | None):
+    """
+    Inline keyboard for a single product screen.
+    Shows product actions + qty/limit controls.
+    """
+    limit_text = "—" if limit_qty is None else str(limit_qty)
+
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✏️ Редагувати", callback_data=f"prod:edit:{prod_id}"),
+            InlineKeyboardButton("🗑️ Видалити", callback_data=f"prod:del:{prod_id}"),
+        ],
+        [
+            InlineKeyboardButton(f"🔢 К-сть: {qty}", callback_data=f"prod:qty:{prod_id}"),
+            InlineKeyboardButton(f"⚠️ Мін к-сть: {limit_text}", callback_data=f"prod:limit:{prod_id}"),
+        ],
+        [InlineKeyboardButton("⬅️ Назад до категорії", callback_data=f"cat:open:{cat_id}")]
+    ])
 
 
 def cancel_keyboard(prefix: str):

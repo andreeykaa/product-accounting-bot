@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
 from app.bot_ui.keyboards import bottom_kb
-from app.bot_ui.screens import show_categories_as_reply
+from app.bot_ui.screens import send_categories_reply
 from app.storage import db
 
 
@@ -10,7 +10,7 @@ async def bottom_categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Bottom button: show categories.
     """
-    await show_categories_as_reply(update.message, context)
+    await send_categories_reply(update.message, context)
 
 
 async def bottom_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -20,7 +20,7 @@ async def bottom_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     context.user_data.pop("active_cat_id", None)
     await update.message.reply_text("🔄 Оновлено.", reply_markup=bottom_kb(chat_id))
-    await show_categories_as_reply(update.message, context)
+    await send_categories_reply(update.message, context)
 
 
 async def bottom_reorder(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -3,7 +3,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 
 from app.storage import db
 from app.bot_ui.keyboards import bottom_kb
-from app.bot_ui.screens import show_categories_as_reply
+from app.bot_ui.screens import send_categories_reply
 from app.handlers.bottom_menu import send_reorder_list
 
 
@@ -22,7 +22,7 @@ async def categories_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Show categories list (as a new message).
     """
-    await show_categories_as_reply(update.message, context)
+    await send_categories_reply(update.message, context)
 
 
 async def reorder_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):

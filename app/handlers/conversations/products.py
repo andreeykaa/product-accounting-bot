@@ -11,7 +11,7 @@ from telegram.ext import (
 
 from app.storage import db
 from app.bot_ui.keyboards import bottom_kb, cancel_keyboard
-from app.bot_ui.screens import show_products_as_reply
+from app.bot_ui.screens import send_category_reply, send_product_reply
 from app.handlers.conversations.common import on_cancel
 from app.utils.parsing import parse_qty, parse_limit
 from app.services.notifications import maybe_notify_limit_crossed
@@ -135,7 +135,7 @@ async def prod_add_limit_skip(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     chat_id = q.message.chat_id
     await q.message.reply_text(f"✅ Додано продукт: {name} — {qty}", reply_markup=bottom_kb(chat_id))
-    await show_products_as_reply(q.message, context, int(cat_id))
+    await send_category_reply(q.message, context, int(cat_id))
     return ConversationHandler.END
 
 
@@ -189,7 +189,7 @@ async def prod_add_limit_value(update: Update, context: ContextTypes.DEFAULT_TYP
         added_msg += f" (ліміт: {limit_qty})"
 
     await update.message.reply_text(added_msg, reply_markup=bottom_kb(chat_id))
-    await show_products_as_reply(update.message, context, int(cat_id))
+    await send_category_reply(update.message, context, int(cat_id))
     return ConversationHandler.END
 
 
@@ -218,7 +218,7 @@ async def prod_rename_from_button(update: Update, context: ContextTypes.DEFAULT_
     return PROD_EDIT_NAME
 
 
-async def prod_rename_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def prod_edit_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Persist product rename.
     """
@@ -228,24 +228,23 @@ async def prod_rename_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return PROD_EDIT_NAME
 
     prod_id = context.user_data.get("prod_rename_id")
-    cat_id = context.user_data.get("active_cat_id")
-    if not prod_id or not cat_id:
-        await update.message.reply_text("Помилка стану. Відкрий категорію і спробуй ще раз.")
+    context.user_data.pop("prod_rename_id", None)
+
+    if not prod_id:
+        await update.message.reply_text("❌ Не знаю, який продукт редагувати. Спробуй ще раз.")
         return ConversationHandler.END
 
-    try:
-        db.update_product_name(int(prod_id), new_name)
-    except sqlite3.IntegrityError:
-        await update.message.reply_text(
-            "Продукт з такою назвою вже існує в цій категорії. Введи іншу назву:",
-            reply_markup=cancel_keyboard("prod"),
-        )
+    new_name = (update.message.text or "").strip()
+    if not new_name:
+        await update.message.reply_text("❗ Назва не може бути порожньою. Введи ще раз:")
         return PROD_EDIT_NAME
 
-    context.user_data.pop("prod_rename_id", None)
+    db.update_product_name(int(prod_id), new_name)
+
     chat_id = update.effective_chat.id
     await update.message.reply_text(f"✅ Назву змінено на: {new_name}", reply_markup=bottom_kb(chat_id))
-    await show_products_as_reply(update.message, context, int(cat_id))
+
+    await send_product_reply(update.message, context, int(prod_id))
     return ConversationHandler.END
 
 
@@ -296,7 +295,7 @@ async def prod_qty_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("prod_qty_id", None)
     chat_id = update.effective_chat.id
     await update.message.reply_text(f"✅ Кількість оновлено: {new_qty}", reply_markup=bottom_kb(chat_id))
-    await show_products_as_reply(update.message, context, int(cat_id))
+    await send_product_reply(update.message, context, int(prod_id))
     return ConversationHandler.END
 
 
@@ -346,7 +345,7 @@ async def prod_limit_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = "✅ Ліміт прибрано." if new_limit is None else f"✅ Ліміт встановлено: {new_limit}"
     await update.message.reply_text(msg, reply_markup=bottom_kb(chat_id))
-    await show_products_as_reply(update.message, context, int(cat_id))
+    await send_product_reply(update.message, context, int(prod_id))
     return ConversationHandler.END
 
 
@@ -369,8 +368,8 @@ def register_product_conversations(app: Application) -> None:
     ))
 
     app.add_handler(ConversationHandler(
-        entry_points=[CallbackQueryHandler(prod_rename_from_button, pattern=r"^prod:rename:\d+$")],
-        states={PROD_EDIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, prod_rename_name)]},
+        entry_points=[CallbackQueryHandler(prod_rename_from_button, pattern=r"^prod:edit:\d+$")],
+        states={PROD_EDIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, prod_edit_name)]},
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^(cat:cancel|prod:cancel)$")],
         allow_reentry=True,
     ))

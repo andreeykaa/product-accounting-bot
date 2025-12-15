@@ -2,8 +2,8 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 
 from app.storage import db
-from app.bot_ui.screens import show_categories_as_edit, show_products_as_edit, safe_edit_message, \
-    show_categories_as_reply
+from app.bot_ui.screens import render_categories_edit, render_category_edit, safe_edit_message, \
+    send_categories_reply, render_product_edit, send_category_reply
 from app.bot_ui.keyboards import category_actions_keyboard
 
 
@@ -19,13 +19,13 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "nav:cats":
         context.user_data.pop("active_cat_id", None)
-        await show_categories_as_edit(q, context)
+        await render_categories_edit(q, context)
         return
 
     if len(parts) == 3 and parts[0] == "cat" and parts[1] == "open":
         cat_id = int(parts[2])
         context.user_data["active_cat_id"] = cat_id
-        await show_products_as_edit(q, context, cat_id)
+        await render_category_edit(q, context, cat_id)
         return
 
     # Category delete confirmation
@@ -51,7 +51,7 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_edit_message(q, text=q.message.text or " ", reply_markup=None)
 
         await q.message.reply_text("🗑️ Категорію видалено.")
-        await show_categories_as_reply(q.message, context)
+        await send_categories_reply(q.message, context)
         return
 
     if len(parts) == 3 and parts[0] == "cat" and parts[1] == "actions":
@@ -68,6 +68,11 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"📦 Категорія: {cat[1]}",
             reply_markup=category_actions_keyboard(cat_id),
         )
+        return
+
+    if len(parts) == 3 and parts[0] == "prod" and parts[1] == "open":
+        prod_id = int(parts[2])
+        await render_product_edit(q, context, prod_id)
         return
 
     # Product delete confirmation
@@ -99,7 +104,7 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.delete_product(prod_id)
 
         await q.message.reply_text("🗑️ Продукт видалено.")
-        await show_products_as_edit(q, context, int(cat_id))
+        await send_category_reply(q.message, context, int(cat_id))
         return
 
 
@@ -109,5 +114,5 @@ def register_callback_handlers(app: Application) -> None:
     """
     app.add_handler(CallbackQueryHandler(
         callbacks,
-        pattern=r"^(nav:cats|cat:open:\d+|cat:actions:\d+|cat:del:\d+|cat:del_yes:\d+|prod:del:\d+|prod:del_yes:\d+)$"
+        pattern=r"^(nav:cats|cat:open:\d+|cat:actions:\d+|cat:del:\d+|cat:del_yes:\d+|prod:open:\d+|prod:del:\d+|prod:del_yes:\d+)$"
     ))

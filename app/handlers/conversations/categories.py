@@ -12,7 +12,7 @@ from telegram.ext import (
 
 from app.storage import db
 from app.bot_ui.keyboards import bottom_kb, cancel_keyboard
-from app.bot_ui.screens import show_categories_as_reply
+from app.bot_ui.screens import send_categories_reply, send_category_reply
 from app.handlers.conversations.common import on_cancel
 
 CAT_ADD_NAME = 1
@@ -54,7 +54,7 @@ async def cat_add_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
     await update.message.reply_text(f"✅ Додано категорію: {name}", reply_markup=bottom_kb(chat_id))
-    await show_categories_as_reply(update.message, context)
+    await send_categories_reply(update.message, context)
     return ConversationHandler.END
 
 
@@ -102,7 +102,7 @@ async def cat_edit_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("cat_edit_id", None)
     chat_id = update.effective_chat.id
     await update.message.reply_text(f"✅ Категорію перейменовано на: {new_name}", reply_markup=bottom_kb(chat_id))
-    await show_categories_as_reply(update.message, context)
+    await send_category_reply(update.message, context, int(cat_id))
     return ConversationHandler.END
 
 
