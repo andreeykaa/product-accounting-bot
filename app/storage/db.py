@@ -1,7 +1,12 @@
 import sqlite3
 from typing import Optional, List, Tuple
+import os
+from pathlib import Path
 
-DB_PATH = "bot.db"
+DB_PATH = os.getenv("DB_PATH", "data/bot.db")
+db_file = Path(DB_PATH)
+if db_file.parent and str(db_file.parent) not in (".", ""):
+    db_file.parent.mkdir(parents=True, exist_ok=True)
 
 
 def connect() -> sqlite3.Connection:
