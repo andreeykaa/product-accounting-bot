@@ -45,6 +45,18 @@ def init_db() -> None:
             )
         """)
 
+        # --- TASKS table ---
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                is_done INTEGER NOT NULL DEFAULT 0,
+                created TEXT NOT NULL DEFAULT (datetime('now')),
+                task_cat_id INTEGER NOT NULL CHECK(task_cat_id IN (1, 2, 3))
+            )
+        """)
+
         # Simple migrations for older DBs
         cols = [row[1] for row in con.execute("PRAGMA table_info(products)").fetchall()]
         if "limit_qty" not in cols:
@@ -204,3 +216,91 @@ def list_reorder_items() -> List[Tuple[int, str, int, str, float, float]]:
             ORDER BY c.name ASC, p.name ASC
         """)
         return cur.fetchall()
+
+
+# ===== Tasks =====
+
+def add_task(user_id: int, text: str, task_cat_id: int) -> int:
+    """
+    Create a task. Returns new task id.
+    """
+    text = text.strip()
+    if not text:
+        raise ValueError("Task text is empty")
+
+    with connect() as con:
+        cur = con.execute(
+            "INSERT INTO tasks(user_id, text, task_cat_id) VALUES (?, ?, ?)",
+            (int(user_id), text, int(task_cat_id)),
+        )
+        con.commit()
+        return int(cur.lastrowid)
+
+
+def list_all_tasks_by_category(task_cat_id: int, include_done: bool = False) -> List[Tuple[int, str]]:
+    """
+    List tasks for a category. If include_done=False -> only not done.
+    """
+    with connect() as con:
+        if include_done:
+            cur = con.execute(
+                """
+                SELECT id, text, task_cat_id
+                FROM tasks
+                WHERE task_cat_id=?
+                ORDER BY is_done ASC, id DESC
+                """,
+                (int(task_cat_id),),
+            )
+        else:
+            cur = con.execute(
+                """
+                SELECT id, text, task_cat_id
+                FROM tasks
+                WHERE task_cat_id=? AND is_done=0
+                ORDER BY id DESC
+                """,
+                (int(task_cat_id),),
+            )
+        return [(task_id, text, task_cat_id) for (task_id, text, task_cat_id) in cur.fetchall()]
+
+
+def get_task(task_id: int) -> Optional[tuple[int, str, int]]:
+    """
+    Get one task by id.
+    """
+    with connect() as con:
+        cur = con.execute(
+            """
+            SELECT id, text, task_cat_id
+            FROM tasks
+            WHERE id=?
+            """,
+            (int(task_id),),
+        )
+        return cur.fetchone()
+
+
+def update_task(task_id: int, new_text: str) -> None:
+    """
+    Update task text.
+    """
+    new_text = new_text.strip()
+    if not new_text:
+        raise ValueError("Task text is empty")
+
+    with connect() as con:
+        con.execute("UPDATE tasks SET text=? WHERE id=?", (new_text, int(task_id)))
+        con.commit()
+
+
+def set_task_done(task_id: int, is_done: bool) -> None:
+    """
+    Set done status explicitly.
+    """
+    with connect() as con:
+        con.execute(
+            "UPDATE tasks SET is_done=? WHERE id=?",
+            (1 if is_done else 0, int(task_id)),
+        )
+        con.commit()

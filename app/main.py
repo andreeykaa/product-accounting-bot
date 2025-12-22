@@ -1,6 +1,7 @@
 from telegram.ext import Application
 
 from app.config import get_bot_token
+from app.handlers.conversations.tasks import register_task_conversations
 from app.storage import db
 from app.handlers.commands import register_command_handlers
 from app.handlers.bottom_menu import register_bottom_menu_handlers
@@ -22,6 +23,7 @@ def main() -> None:
     register_bottom_menu_handlers(app)
     register_category_conversations(app)
     register_product_conversations(app)
+    register_task_conversations(app)
     register_callback_handlers(app)
 
     app.run_polling()

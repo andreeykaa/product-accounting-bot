@@ -11,7 +11,7 @@ from app.bot_ui.screens import (
     render_category_edit,
     render_product_edit,
     send_categories_reply,
-    send_category_reply,
+    send_category_reply, render_tasks_cat_edit, render_tasks_edit, render_task_edit, send_tasks_reply,
 )
 from app.bot_ui.keyboards import category_actions_keyboard
 
@@ -68,6 +68,11 @@ async def handle_nav(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: C
     if cb.action == "cats":
         context.user_data.pop("active_cat_id", None)
         await render_categories_edit(q, context)
+        return
+
+    if cb.action == "task_proc":
+        context.user_data.pop("active_task_proc_id", None)
+        await render_tasks_cat_edit(q, context)
         return
 
 
@@ -165,6 +170,41 @@ async def handle_prod(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: 
         return
 
 
+async def handle_tasks_cat(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: Callback) -> None:
+    """
+    Handle tasks category callbacks.
+    """
+    tc_id = cb.entity_id
+    if cb.action == "open":
+        context.user_data["active_tc_id"] = tc_id
+        await render_tasks_edit(q, context, tc_id)
+        return
+
+
+async def handle_tasks(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: Callback) -> None:
+    """
+    Handle tasks callbacks.
+    """
+    task_id = cb.entity_id
+    if cb.action == "open":
+        context.user_data["active_task_id"] = task_id
+        await render_task_edit(q, context, task_id)
+        return
+
+    if cb.action == "done":
+        task = db.get_task(task_id)
+        if not task:
+            await q.message.reply_text("Завдання не знайдено.")
+            return
+
+        task_id, task_text, task_cat_id = task
+        db.set_task_done(task_id, 1)
+
+        await q.message.reply_text("✅ Завдання виконано!")
+        await send_tasks_reply(q.message, context, int(task_cat_id))
+        return
+
+
 # ---------- Entry point ----------
 
 async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -188,6 +228,14 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if cb.scope == "prod":
         await handle_prod(q, context, cb)
+        return
+
+    if cb.scope == "task_proc":
+        await handle_tasks_cat(q, context, cb)
+        return
+
+    if cb.scope == "task":
+        await handle_tasks(q, context, cb)
         return
 
 

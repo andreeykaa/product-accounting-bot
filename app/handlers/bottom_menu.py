@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
 from app.bot_ui.keyboards import bottom_kb
-from app.bot_ui.screens import send_categories_reply
+from app.bot_ui.screens import send_categories_reply, send_tasks_cat_reply
 from app.storage import db
 
 
@@ -48,6 +48,13 @@ async def bottom_unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text("🔕 Ти відписаний(а) від сповіщень.", reply_markup=bottom_kb(chat_id))
 
 
+async def bottom_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Bottom button: show categories.
+    """
+    await send_tasks_cat_reply(update.message, context)
+
+
 async def send_reorder_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Render reorder list based on current DB state.
@@ -80,3 +87,4 @@ def register_bottom_menu_handlers(app: Application) -> None:
     app.add_handler(MessageHandler(filters.Regex(r"^📝 Дозамовити$"), bottom_reorder))
     app.add_handler(MessageHandler(filters.Regex(r"^🔔 Підписатися$"), bottom_subscribe))
     app.add_handler(MessageHandler(filters.Regex(r"^🔕 Відписатися$"), bottom_unsubscribe))
+    app.add_handler(MessageHandler(filters.Regex(r"^📝 Список завдань$"), bottom_tasks))

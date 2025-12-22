@@ -5,6 +5,7 @@ from telegram import (
     KeyboardButton,
 )
 
+from app.config import TASK_PROCESSES
 from app.storage import db
 
 
@@ -17,8 +18,9 @@ def bottom_kb(chat_id: int) -> ReplyKeyboardMarkup:
 
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton("🏠 Категорії"), KeyboardButton("🔄 Оновити базу")],
-            [KeyboardButton("📝 Дозамовити"), sub_btn],
+            [KeyboardButton("🏠 Категорії"), KeyboardButton("📝 Список завдань")],
+            [KeyboardButton("📝 Дозамовити"), KeyboardButton("🔄 Оновити базу")],
+            [sub_btn]
         ],
         resize_keyboard=True,
     )
@@ -84,6 +86,43 @@ def product_view_keyboard(prod_id: int, cat_id: int, qty: float, limit_qty: floa
             InlineKeyboardButton(f"⚠️ Мін к-сть: {limit_text}", callback_data=f"prod:limit:{prod_id}"),
         ],
         [InlineKeyboardButton("⬅️ Назад до категорії", callback_data=f"cat:open:{cat_id}")]
+    ])
+
+
+def tasks_cat_keyboard():
+    tasks_cat = TASK_PROCESSES.items()
+    kb = []
+
+    for tc_id, data in tasks_cat:
+        kb.append([InlineKeyboardButton(f"{data['name']}", callback_data=f"task_proc:open:{tc_id}")])
+
+    return InlineKeyboardMarkup(kb)
+
+
+def tasks_keyboard(tc_id: int, tasks_rows):
+    """
+    Inline keyboard for products inside a category.
+    """
+    kb = [
+        [InlineKeyboardButton("➕ Додати завдання", callback_data=f"task_proc:add:{tc_id}")]
+    ]
+
+    for i, (task_id, task_text, task_cat_id) in enumerate(tasks_rows, start=1):
+        kb.append([InlineKeyboardButton(f"{i}. {task_text}", callback_data=f"task:open:{task_id}")])
+
+    kb.append([InlineKeyboardButton("⬅️ Назад до процесів", callback_data="nav:task_proc")])
+
+    return InlineKeyboardMarkup(kb)
+
+
+def task_view_keyboard(task_id: int, task_cat_id: int | None):
+    tasks_cat_name = TASK_PROCESSES[task_cat_id]['name']
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✏️ Редагувати", callback_data=f"task:edit:{task_id}"),
+            InlineKeyboardButton("✅ Виконано", callback_data=f"task:done:{task_id}"),
+        ],
+        [InlineKeyboardButton(f"⬅️ Назад до {tasks_cat_name}", callback_data=f"task_proc:open:{task_cat_id}")]
     ])
 
 

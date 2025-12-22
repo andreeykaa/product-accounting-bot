@@ -1,8 +1,10 @@
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
+from app.config import TASK_PROCESSES
 from app.storage import db
-from app.bot_ui.keyboards import categories_keyboard, products_keyboard, product_view_keyboard
+from app.bot_ui.keyboards import categories_keyboard, products_keyboard, product_view_keyboard, tasks_cat_keyboard, \
+    tasks_keyboard, task_view_keyboard
 from telegram import CallbackQuery
 
 
@@ -151,4 +153,86 @@ async def send_product_reply(message, context: ContextTypes.DEFAULT_TYPE, prod_i
     await message.reply_text(
         text,
         reply_markup=product_view_keyboard(prod_id, cat_id, qty, limit_qty),
+    )
+
+
+async def send_tasks_cat_reply(message, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Send the tasks categories list as a new message.
+
+    Behavior:
+    - Builds a short screen text
+    - Attaches inline keyboard with tasks categories
+    """
+    text = "Категорії списку завдань:"
+    await message.reply_text(text, reply_markup=tasks_cat_keyboard())
+
+
+async def render_tasks_cat_edit(query, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Render (update) a tasks category screen by editing the current inline message.
+
+    Behavior:
+    - Edits the current message with updated text and inline keyboard
+    """
+    text = "Категорії списку завдань:"
+    await safe_edit_message(query, text, reply_markup=tasks_cat_keyboard())
+
+
+async def send_tasks_reply(message, context: ContextTypes.DEFAULT_TYPE, tc_id) -> None:
+    tasks_cat = TASK_PROCESSES[tc_id]['name']
+    tasks_rows = db.list_all_tasks_by_category(tc_id)
+
+    if tasks_rows:
+        text = f"📋 Список завдань: {tasks_cat}\n\n"
+    else:
+        text = f"📦 Процес: {tasks_cat}\n\nЗавдань поки немає."
+
+    await message.reply_text(text, reply_markup=tasks_keyboard(tc_id, tasks_rows))
+
+
+async def render_tasks_edit(query, context: ContextTypes.DEFAULT_TYPE, tc_id) -> None:
+    tasks_cat = TASK_PROCESSES[tc_id]['name']
+    tasks_rows = db.list_all_tasks_by_category(tc_id)
+
+    if tasks_rows:
+        text = f"📋 Список завдань: {tasks_cat}\n\n"
+    else:
+        text = f"📦 Процес: {tasks_cat}\n\nЗавдань поки немає."
+
+    await safe_edit_message(
+        query,
+        text,
+        reply_markup=tasks_keyboard(tc_id, tasks_rows)
+    )
+
+
+async def render_task_edit(query, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
+    task = db.get_task(task_id)
+    if not task:
+        await query.answer("Завдання не знайдено.", show_alert=True)
+        return
+
+    task_id, task_text, task_cat_id = task
+    text = f"🏷️ Завдання:\n {task_text}"
+
+    await safe_edit_message(
+        query,
+        text,
+        reply_markup=task_view_keyboard(task_id, task_cat_id),
+    )
+
+
+async def send_task_reply(message, context: ContextTypes.DEFAULT_TYPE, task_id: int) -> None:
+    task = db.get_task(task_id)
+    if not task:
+        await message.answer("Завдання не знайдено.", show_alert=True)
+        return
+
+    task_id, task_text, task_cat_id = task
+    text = f"🏷️ Завдання:\n {task_text}"
+
+    await message.reply_text(
+        text,
+        reply_markup=task_view_keyboard(task_id, task_cat_id),
     )

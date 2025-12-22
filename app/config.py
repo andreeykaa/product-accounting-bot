@@ -1,6 +1,22 @@
 from dotenv import dotenv_values
 
 
+TASK_PROCESSES = {
+    1: {
+        "key": "cold",
+        "name": "Холодний процес"
+    },
+    2: {
+        "key": "hot",
+        "name": "Гарячий процес"
+    },
+    3: {
+        "key": "delivery",
+        "name": "Видача"
+    }
+}
+
+
 def get_bot_token(env_path: str = ".env") -> str:
     """
     Load BOT_TOKEN from .env.
