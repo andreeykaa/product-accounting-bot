@@ -16,7 +16,7 @@ def main() -> None:
     """
     db.init_db()
 
-    token = get_bot_token(".env")
+    token = get_bot_token()
     app = Application.builder().token(token).build()
 
     register_command_handlers(app)

@@ -1,5 +1,8 @@
-from dotenv import dotenv_values
+import os
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 TASK_PROCESSES = {
     1: {
@@ -17,15 +20,14 @@ TASK_PROCESSES = {
 }
 
 
-def get_bot_token(env_path: str = ".env") -> str:
+def get_bot_token() -> str:
     """
-    Load BOT_TOKEN from .env.
+    Load BOT_TOKEN from environment variables.
 
     Raises:
         RuntimeError: If BOT_TOKEN is missing.
     """
-    env = dotenv_values(env_path)
-    token = env.get("BOT_TOKEN")
+    token = os.getenv("BOT_TOKEN")
     if not token:
-        raise RuntimeError("BOT_TOKEN not found in .env")
+        raise RuntimeError("BOT_TOKEN not found in environment variables")
     return token
