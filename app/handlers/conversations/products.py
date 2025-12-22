@@ -1,4 +1,5 @@
 import sqlite3
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -90,8 +91,8 @@ async def prod_add_qty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         qty = parse_qty(update.message.text)
-    except Exception:
-        await update.message.reply_text("Кількість має бути числом > 0. Приклад: 3 або 1.5. Введи ще раз:")
+    except ValueError:
+        await update.message.reply_text("Кількість має бути числом => 0. Введи ще раз:")
         return PROD_ADD_QTY
 
     # Store qty and proceed to optional limit step
@@ -160,7 +161,7 @@ async def prod_add_limit_value(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         try:
             limit_qty = parse_limit(text)  # supports '-', '0' => None
-        except Exception:
+        except ValueError:
             await update.message.reply_text(
                 "Ліміт має бути числом > 0.\n"
                 "Щоб прибрати ліміт — введи '-' або 0.\n"
@@ -285,8 +286,8 @@ async def prod_qty_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         new_qty = parse_qty(update.message.text)
-    except Exception:
-        await update.message.reply_text("Кількість має бути числом > 0. Приклад: 3 або 1.5. Введи ще раз:")
+    except ValueError:
+        await update.message.reply_text("Кількість має бути числом => 0. Введи ще раз:")
         return PROD_EDIT_QTY
 
     db.update_product_qty(int(prod_id), new_qty)
@@ -336,7 +337,16 @@ async def prod_limit_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Помилка стану. Відкрий категорію і спробуй ще раз.")
         return ConversationHandler.END
 
-    new_limit = parse_limit(update.message.text)
+    try:
+        new_limit = parse_limit(update.message.text)
+    except ValueError:
+        await update.message.reply_text(
+            "Ліміт має бути числом > 0.\n"
+            "Щоб прибрати ліміт — введи '-' або 0.\n"
+            "Або натисни «Пропустити».",
+            reply_markup=add_limit_keyboard(),
+        )
+        return PROD_EDIT_LIMIT
     db.update_product_limit(int(prod_id), new_limit)
     await maybe_notify_limit_crossed(context, int(prod_id))
 
