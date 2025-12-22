@@ -19,8 +19,7 @@ async def bottom_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     chat_id = update.effective_chat.id
     context.user_data.pop("active_cat_id", None)
-    await update.message.reply_text("🔄 Оновлено.", reply_markup=bottom_kb(chat_id))
-    await send_categories_reply(update.message, context)
+    await update.message.reply_text("🔄 Оновлено\n\nБот меню ⬇️", reply_markup=bottom_kb(chat_id))
 
 
 async def bottom_reorder(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -83,7 +82,7 @@ def register_bottom_menu_handlers(app: Application) -> None:
     Register handlers for ReplyKeyboardMarkup buttons.
     """
     app.add_handler(MessageHandler(filters.Regex(r"^🏠 Категорії$"), bottom_categories))
-    app.add_handler(MessageHandler(filters.Regex(r"^🔄 Оновити базу$"), bottom_refresh))
+    app.add_handler(MessageHandler(filters.Regex(r"^🔄 Оновити"), bottom_refresh))
     app.add_handler(MessageHandler(filters.Regex(r"^📝 Дозамовити$"), bottom_reorder))
     app.add_handler(MessageHandler(filters.Regex(r"^🔔 Підписатися$"), bottom_subscribe))
     app.add_handler(MessageHandler(filters.Regex(r"^🔕 Відписатися$"), bottom_unsubscribe))

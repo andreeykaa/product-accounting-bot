@@ -19,7 +19,7 @@ def bottom_kb(chat_id: int) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton("🏠 Категорії"), KeyboardButton("📝 Список завдань")],
-            [KeyboardButton("📝 Дозамовити"), KeyboardButton("🔄 Оновити базу")],
+            [KeyboardButton("📝 Дозамовити"), KeyboardButton("🔄 Оновити дані")],
             [sub_btn]
         ],
         resize_keyboard=True,
