@@ -374,7 +374,6 @@ def register_product_conversations(app: Application) -> None:
         },
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^(cat:cancel|prod:cancel)$")],
         allow_reentry=True,
-        per_message=True,
     ))
 
     app.add_handler(ConversationHandler(
@@ -382,7 +381,6 @@ def register_product_conversations(app: Application) -> None:
         states={PROD_EDIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, prod_edit_name)]},
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^(cat:cancel|prod:cancel)$")],
         allow_reentry=True,
-        per_message=True,
     ))
 
     app.add_handler(ConversationHandler(
@@ -390,7 +388,6 @@ def register_product_conversations(app: Application) -> None:
         states={PROD_EDIT_QTY: [MessageHandler(filters.TEXT & ~filters.COMMAND, prod_qty_value)]},
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^(cat:cancel|prod:cancel)$")],
         allow_reentry=True,
-        per_message=True,
     ))
 
     app.add_handler(ConversationHandler(
@@ -398,5 +395,4 @@ def register_product_conversations(app: Application) -> None:
         states={PROD_EDIT_LIMIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, prod_limit_value)]},
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^(cat:cancel|prod:cancel)$")],
         allow_reentry=True,
-        per_message=True,
     ))

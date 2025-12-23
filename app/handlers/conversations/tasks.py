@@ -111,7 +111,6 @@ def register_task_conversations(app: Application) -> None:
         states={TASK_ADD_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, task_add_text)]},
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^(task_proc:cancel)$")],
         allow_reentry=True,
-        per_message=True,
     ))
 
     app.add_handler(ConversationHandler(
@@ -119,5 +118,4 @@ def register_task_conversations(app: Application) -> None:
         states={TASK_EDIT_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, task_edit_text)]},
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^^(task_proc:cancel)$")],
         allow_reentry=True,
-        per_message=True,
     ))
