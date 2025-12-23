@@ -118,6 +118,7 @@ def register_category_conversations(app: Application) -> None:
         states={CAT_ADD_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cat_add_name)]},
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^(cat:cancel|prod:cancel)$")],
         allow_reentry=True,
+        per_message=True,
     ))
 
     app.add_handler(ConversationHandler(
@@ -125,4 +126,5 @@ def register_category_conversations(app: Application) -> None:
         states={CAT_EDIT_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, cat_edit_name)]},
         fallbacks=[CallbackQueryHandler(on_cancel, pattern=r"^(cat:cancel|prod:cancel)$")],
         allow_reentry=True,
+        per_message=True,
     ))
