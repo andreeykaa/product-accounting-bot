@@ -62,8 +62,6 @@ def init_db() -> None:
             )
         """)
 
-        con.execute("DROP TABLE IF EXISTS tech_cards")
-
         # --- TECH CARDS table ---
         con.execute("""
             CREATE TABLE IF NOT EXISTS tech_cards (
