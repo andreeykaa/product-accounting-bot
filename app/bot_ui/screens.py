@@ -1,10 +1,10 @@
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
-from app.config import TASK_PROCESSES
+from app.config import PROCESSES, TARGETS_CARD
 from app.storage import db
 from app.bot_ui.keyboards import categories_keyboard, products_keyboard, product_view_keyboard, tasks_cat_keyboard, \
-    tasks_keyboard, task_view_keyboard
+    tasks_keyboard, task_view_keyboard, tech_cards_cat_keyboard, tech_cards_type_keyboard, tech_cards_keyboard
 from telegram import CallbackQuery
 
 
@@ -180,7 +180,7 @@ async def render_tasks_cat_edit(query, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def send_tasks_reply(message, context: ContextTypes.DEFAULT_TYPE, tc_id) -> None:
-    tasks_cat = TASK_PROCESSES[tc_id]['name']
+    tasks_cat = PROCESSES[tc_id]['name']
     tasks_rows = db.list_all_tasks_by_category(tc_id)
 
     if tasks_rows:
@@ -192,7 +192,7 @@ async def send_tasks_reply(message, context: ContextTypes.DEFAULT_TYPE, tc_id) -
 
 
 async def render_tasks_edit(query, context: ContextTypes.DEFAULT_TYPE, tc_id) -> None:
-    tasks_cat = TASK_PROCESSES[tc_id]['name']
+    tasks_cat = PROCESSES[tc_id]['name']
     tasks_rows = db.list_all_tasks_by_category(tc_id)
 
     if tasks_rows:
@@ -235,4 +235,86 @@ async def send_task_reply(message, context: ContextTypes.DEFAULT_TYPE, task_id: 
     await message.reply_text(
         text,
         reply_markup=task_view_keyboard(task_id, task_cat_id),
+    )
+
+
+async def send_tech_cards_cat_reply(message, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Send the tech cards categories list as a new message.
+
+    Behavior:
+    - Builds a short screen text
+    - Attaches inline keyboard with tech cards categories
+    """
+    text = "Категорії технічних карт:"
+    await message.reply_text(text, reply_markup=tech_cards_cat_keyboard())
+
+
+async def render_tech_cards_cat_edit(query, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Render (update) a tech cards category screen by editing the current inline message.
+
+    Behavior:
+    - Edits the current message with updated text and inline keyboard
+    """
+    text = "Категорії технічних карт:"
+    await safe_edit_message(query, text, reply_markup=tech_cards_cat_keyboard())
+
+
+async def send_tech_cards_type_reply(message, context: ContextTypes.DEFAULT_TYPE, tech_card_cat_id) -> None:
+    """
+    Send the tech cards types list as a new message.
+
+    Behavior:
+    - Builds a short screen text
+    - Attaches inline keyboard with tech cards categories
+    """
+    tech_card_cat = PROCESSES[tech_card_cat_id]['name']
+    text = f"{tech_card_cat}\nТехнічні карти для:"
+    await message.reply_text(text, reply_markup=tech_cards_type_keyboard())
+
+
+async def render_tech_cards_type_edit(query, context: ContextTypes.DEFAULT_TYPE, tech_card_cat_id) -> None:
+    """
+    Render (update) a tech cards types screen by editing the current inline message.
+
+    Behavior:
+    - Edits the current message with updated text and inline keyboard
+    """
+    tech_card_cat = PROCESSES[tech_card_cat_id]['name']
+    text = f"{tech_card_cat}\nТехнічні карти для:"
+    await safe_edit_message(query, text, reply_markup=tech_cards_type_keyboard())
+
+
+async def send_tech_cards_reply(message, context: ContextTypes.DEFAULT_TYPE, tech_card_cat_id, tech_card_type_id) -> None:
+    card_cat = PROCESSES[tech_card_cat_id]['name']
+    card_type = TARGETS_CARD[tech_card_type_id]['name']
+    # card_rows = db.get_list_tech_cards(tech_card_cat_id, tech_card_type_id)
+    card_rows = []
+
+    type_emoji = "🍽" if TARGETS_CARD[tech_card_type_id]["key"] == "dish" else "🥣"
+    if card_rows:
+        text = f"📋 Технічні карти\n{card_cat} · {type_emoji} {card_type}"
+    else:
+        text = f"📋 Технічні карти\n{card_cat} · {type_emoji} {card_type}\n\nТехнічних карт поки немає."
+
+    await message.reply_text(text, reply_markup=tech_cards_keyboard(tech_card_cat_id, tech_card_type_id, card_rows))
+
+
+async def render_tech_cards_edit(query, context: ContextTypes.DEFAULT_TYPE, tech_card_cat_id, tech_card_type_id) -> None:
+    card_cat = PROCESSES[tech_card_cat_id]['name']
+    card_type = TARGETS_CARD[tech_card_type_id]['name']
+    # card_rows = db.get_list_tech_cards(tech_card_cat_id, tech_card_type_id)
+    card_rows = []
+
+    type_emoji = "🍽" if TARGETS_CARD[tech_card_type_id]["key"] == "dish" else "🥣"
+    if card_rows:
+        text = f"📋 Технічні карти\n{card_cat} · {type_emoji} {card_type}"
+    else:
+        text = f"📋 Технічні карти\n{card_cat} · {type_emoji} {card_type}\n\nТехнічних карт поки немає."
+
+    await safe_edit_message(
+        query,
+        text,
+        reply_markup=tech_cards_keyboard(tech_card_cat_id, tech_card_type_id, card_rows)
     )

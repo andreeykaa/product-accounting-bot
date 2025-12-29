@@ -5,7 +5,7 @@ from telegram import (
     KeyboardButton,
 )
 
-from app.config import TASK_PROCESSES
+from app.config import PROCESSES, TARGETS_CARD
 from app.storage import db
 
 
@@ -19,8 +19,8 @@ def bottom_kb(chat_id: int) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton("🏠 Категорії"), KeyboardButton("📝 Список завдань")],
-            [KeyboardButton("📝 Дозамовити"), KeyboardButton("🔄 Оновити дані")],
-            [sub_btn]
+            [KeyboardButton("📝 Дозамовити"), KeyboardButton("📝 Тех-карти")],
+            [KeyboardButton("🔄 Оновити дані"), sub_btn]
         ],
         resize_keyboard=True,
     )
@@ -90,7 +90,7 @@ def product_view_keyboard(prod_id: int, cat_id: int, qty: float, limit_qty: floa
 
 
 def tasks_cat_keyboard():
-    tasks_cat = TASK_PROCESSES.items()
+    tasks_cat = PROCESSES.items()
     kb = []
 
     for tc_id, data in tasks_cat:
@@ -116,7 +116,7 @@ def tasks_keyboard(tc_id: int, tasks_rows):
 
 
 def task_view_keyboard(task_id: int, task_cat_id: int | None):
-    tasks_cat_name = TASK_PROCESSES[task_cat_id]['name']
+    tasks_cat_name = PROCESSES[task_cat_id]['name']
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("✏️ Редагувати", callback_data=f"task:edit:{task_id}"),
@@ -124,6 +124,51 @@ def task_view_keyboard(task_id: int, task_cat_id: int | None):
         ],
         [InlineKeyboardButton(f"⬅️ Назад до {tasks_cat_name}", callback_data=f"task_proc:open:{task_cat_id}")]
     ])
+
+
+def tech_cards_cat_keyboard():
+    cards_cat = PROCESSES.items()
+    kb = []
+
+    for tcc_id, data in cards_cat:
+        kb.append([InlineKeyboardButton(f"{data['name']}", callback_data=f"tech_cat:open:{tcc_id}")])
+
+    return InlineKeyboardMarkup(kb)
+
+
+def tech_cards_type_keyboard():
+    EMOJI_BY_TARGET = {
+        "dish": "🍽",
+        "prep": "🥣",
+    }
+
+    cards_type = TARGETS_CARD.items()
+    kb = []
+
+    for target_id, data in cards_type:
+        emoji = EMOJI_BY_TARGET.get(data["key"], "")
+        kb.append([InlineKeyboardButton(f"{emoji} {data['name']}", callback_data=f"tech_type:open:{target_id}")])
+
+    kb.append([InlineKeyboardButton("⬅️ Назад до процесів", callback_data="nav:tech_cat")])
+
+    return InlineKeyboardMarkup(kb)
+
+
+def tech_cards_keyboard(card_cat_id: int, card_type_id: int, card_rows):
+
+    """
+    Inline keyboard for products inside a category.
+    """
+    kb = [
+        [InlineKeyboardButton("➕ Додати тех-карту", callback_data=f"tech_card:add:{card_cat_id}:{card_type_id}")]
+    ]
+
+    for card in card_rows:
+        kb.append([InlineKeyboardButton(f"{card['name']}", callback_data=f"tech_card:open:{card['card_id']}")])
+
+    kb.append([InlineKeyboardButton("⬅️ Назад до типів", callback_data="nav:tech_type")])
+
+    return InlineKeyboardMarkup(kb)
 
 
 def cancel_keyboard(prefix: str):

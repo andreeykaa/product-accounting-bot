@@ -12,6 +12,7 @@ from app.bot_ui.screens import (
     render_product_edit,
     send_categories_reply,
     send_category_reply, render_tasks_cat_edit, render_tasks_edit, render_task_edit, send_tasks_reply,
+    render_tech_cards_type_edit, render_tech_cards_cat_edit, render_tech_cards_edit,
 )
 from app.bot_ui.keyboards import category_actions_keyboard
 
@@ -73,6 +74,17 @@ async def handle_nav(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: C
     if cb.action == "task_proc":
         context.user_data.pop("active_task_proc_id", None)
         await render_tasks_cat_edit(q, context)
+        return
+
+    if cb.action == "tech_cat":
+        context.user_data.pop("active_tech_card_cat_id", None)
+        await render_tech_cards_cat_edit(q, context)
+        return
+
+    if cb.action == "tech_type":
+        tech_card_cat_id = context.user_data.get("active_tech_card_cat_id")
+        context.user_data.pop("active_tech_card_type_id", None)
+        await render_tech_cards_type_edit(q, context, tech_card_cat_id)
         return
 
 
@@ -205,6 +217,29 @@ async def handle_tasks(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb:
         return
 
 
+async def handle_tech_cards_cat(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: Callback) -> None:
+    """
+    Handle tasks category callbacks.
+    """
+    tech_card_cat_id = cb.entity_id
+    if cb.action == "open":
+        context.user_data["active_tech_card_cat_id"] = tech_card_cat_id
+        await render_tech_cards_type_edit(q, context, tech_card_cat_id)
+        return
+
+
+async def handle_tech_cards_type(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: Callback) -> None:
+    """
+    Handle tasks category callbacks.
+    """
+    tech_card_type_id = cb.entity_id
+    if cb.action == "open":
+        tech_card_cat_id = context.user_data.get("active_tech_card_cat_id")
+        context.user_data["active_tech_card_type_id"] = tech_card_type_id
+        await render_tech_cards_edit(q, context, tech_card_cat_id, tech_card_type_id)
+        return
+
+
 # ---------- Entry point ----------
 
 async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -236,6 +271,14 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if cb.scope == "task":
         await handle_tasks(q, context, cb)
+        return
+
+    if cb.scope == "tech_cat":
+        await handle_tech_cards_cat(q, context, cb)
+        return
+
+    if cb.scope == "tech_type":
+        await handle_tech_cards_type(q, context, cb)
         return
 
 

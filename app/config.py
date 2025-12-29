@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TASK_PROCESSES = {
+PROCESSES = {
     1: {
         "key": "cold",
         "name": "Холодний процес"
@@ -16,6 +16,17 @@ TASK_PROCESSES = {
     3: {
         "key": "delivery",
         "name": "Видача"
+    }
+}
+
+TARGETS_CARD = {
+    1: {
+        "key": "dish",
+        "name": "Страви"
+    },
+    2: {
+        "key": "prep",
+        "name": "Заготовки"
     }
 }
 
