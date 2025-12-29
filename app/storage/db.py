@@ -62,16 +62,16 @@ def init_db() -> None:
             )
         """)
 
+        con.execute("DROP TABLE IF EXISTS tech_cards")
+
         # --- TECH CARDS table ---
         con.execute("""
             CREATE TABLE IF NOT EXISTS tech_cards (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 photo_file_id TEXT,
-                text TEXT,
                 process_id INTEGER NOT NULL CHECK(process_id IN (1, 2, 3)),
-                target_type INTEGER NOT NULL CHECK(target_type IN (1, 2)),
-                created TEXT NOT NULL DEFAULT (datetime('now'))
+                target_type INTEGER NOT NULL CHECK(target_type IN (1, 2))
             )
         """)
 
