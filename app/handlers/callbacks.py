@@ -4,6 +4,7 @@ from typing import Optional
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 
+from app.handlers.conversations.common import cleanup_last_tech_photo
 from app.storage import db
 from app.bot_ui.screens import (
     safe_edit_message,
@@ -12,9 +13,10 @@ from app.bot_ui.screens import (
     render_product_edit,
     send_categories_reply,
     send_category_reply, render_tasks_cat_edit, render_tasks_edit, render_task_edit, send_tasks_reply,
-    render_tech_cards_type_edit, render_tech_cards_cat_edit, render_tech_cards_edit,
+    render_tech_cards_type_edit, render_tech_cards_cat_edit, render_tech_cards_edit, render_tech_card_edit,
+    send_tech_cards_reply,
 )
-from app.bot_ui.keyboards import category_actions_keyboard
+from app.bot_ui.keyboards import category_actions_keyboard, bottom_kb
 
 
 # ---------- Parsing ----------
@@ -24,28 +26,30 @@ class Callback:
     scope: str            # nav | cat | prod
     action: str           # open | del | del_yes | actions | cats
     entity_id: Optional[int] = None
+    extra_id: Optional[int] = None
 
 
 def parse_callback(data: str) -> Optional[Callback]:
-    """
-    Parse callback_data in format:
-    - nav:cats
-    - cat:open:<id>
-    - cat:del:<id>
-    - cat:del_yes:<id>
-    - cat:actions:<id>
-    - prod:open:<id>
-    - prod:del:<id>
-    - prod:del_yes:<id>
-    """
     parts = (data or "").split(":")
-    if len(parts) == 2:
-        return Callback(scope=parts[0], action=parts[1], entity_id=None)
 
+    # scope:action
+    if len(parts) == 2:
+        scope, action = parts
+        return Callback(scope=scope, action=action)
+
+    # scope:action:<id>
     if len(parts) == 3:
         scope, action, raw_id = parts
         if raw_id.isdigit():
             return Callback(scope=scope, action=action, entity_id=int(raw_id))
+        return None
+
+    # NEW: scope:action:<id1>:<id2>
+    if len(parts) == 4:
+        scope, action, raw1, raw2 = parts
+        if raw1.isdigit() and raw2.isdigit():
+            return Callback(scope=scope, action=action, entity_id=int(raw1), extra_id=int(raw2))
+        return None
 
     return None
 
@@ -219,7 +223,7 @@ async def handle_tasks(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb:
 
 async def handle_tech_cards_cat(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: Callback) -> None:
     """
-    Handle tasks category callbacks.
+    Handle tech cards category callbacks.
     """
     tech_card_cat_id = cb.entity_id
     if cb.action == "open":
@@ -230,13 +234,72 @@ async def handle_tech_cards_cat(q: CallbackQuery, context: ContextTypes.DEFAULT_
 
 async def handle_tech_cards_type(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: Callback) -> None:
     """
-    Handle tasks category callbacks.
+    Handle tech cards type callbacks.
     """
     tech_card_type_id = cb.entity_id
     if cb.action == "open":
         tech_card_cat_id = context.user_data.get("active_tech_card_cat_id")
         context.user_data["active_tech_card_type_id"] = tech_card_type_id
         await render_tech_cards_edit(q, context, tech_card_cat_id, tech_card_type_id)
+        return
+
+
+async def handle_tech_cards(q: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, cb: Callback) -> None:
+    """
+    Handle tech cards-related callbacks.
+    """
+    if cb.scope == "tech_card" and cb.action == "back":
+        await q.answer()
+
+        await cleanup_last_tech_photo(q, context)
+
+        tech_card_cat_id = context.user_data.get("active_tech_card_cat_id")
+        tech_card_type_id = context.user_data.get("active_tech_card_type_id")
+
+        if not tech_card_cat_id or not tech_card_type_id:
+            await q.message.reply_text("Помилка стану. Відкрий «Тех карти» ще раз.")
+            return
+
+        await render_tech_cards_edit(q, context, int(tech_card_cat_id), int(tech_card_type_id))
+        return
+
+    card_id = cb.entity_id
+    if card_id is None:
+        return
+
+    if cb.action == "open":
+        context.user_data["active_tech_card_id"] = card_id
+        await render_tech_card_edit(q, context, card_id)
+        return
+
+    if cb.action == "del":
+        card = db.get_card(card_id)
+        if not card:
+            await q.message.reply_text("Тех-карту не знайдено.")
+            return
+
+        _, name, photo_file_id, process_id, target_type = card
+        context.user_data["active_tech_card_cat_id"] = process_id
+        context.user_data["active_tech_card_type_id"] = target_type
+
+        kb = confirm_kb(
+            yes_cb=f"tech_card:del_yes:{card_id}",
+            no_cb=f"tech_card:open:{card_id}",
+        )
+        await q.message.reply_text(f"Точно видалити Тех-карту «{name}»?", reply_markup=kb)
+        return
+
+    if cb.action == "del_yes":
+        card = db.get_card(card_id)
+        if not card:
+            await q.message.reply_text("Тех-карту не знайдено.")
+            return
+
+        _, name, photo_file_id, process_id, target_type = card
+        db.delete_card(card_id)
+
+        await q.message.reply_text("🗑️ Тех-карту видалено.")
+        await send_tech_cards_reply(q.message, context, int(process_id), int(target_type))
         return
 
 
@@ -279,6 +342,10 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if cb.scope == "tech_type":
         await handle_tech_cards_type(q, context, cb)
+        return
+
+    if cb.scope == "tech_card":
+        await handle_tech_cards(q, context, cb)
         return
 
 

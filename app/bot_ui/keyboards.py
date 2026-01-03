@@ -164,11 +164,30 @@ def tech_cards_keyboard(card_cat_id: int, card_type_id: int, card_rows):
     ]
 
     for card in card_rows:
-        kb.append([InlineKeyboardButton(f"{card['name']}", callback_data=f"tech_card:open:{card['card_id']}")])
+        card_id, card_name, _ = card
+        kb.append([InlineKeyboardButton(f"{card_name}", callback_data=f"tech_card:open:{card_id}")])
 
     kb.append([InlineKeyboardButton("⬅️ Назад до типів", callback_data="nav:tech_type")])
 
     return InlineKeyboardMarkup(kb)
+
+
+def tech_card_view_keyboard(card_id, target_type):
+    """
+    Inline keyboard for a single tech card screen.
+    Shows tech card actions.
+    """
+
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✏️ Ред. назву", callback_data=f"tech_card:edit_name:{card_id}"),
+            InlineKeyboardButton("✏️ Ред. фото", callback_data=f"tech_card:edit_photo:{card_id}"),
+        ],
+        [
+            InlineKeyboardButton("🗑️ Видалити", callback_data=f"tech_card:del:{card_id}"),
+        ],
+        [InlineKeyboardButton("⬅️ Назад до списку тех-карт", callback_data="tech_card:back")]
+    ])
 
 
 def cancel_keyboard(prefix: str):

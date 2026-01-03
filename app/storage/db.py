@@ -325,3 +325,91 @@ def set_task_done(task_id: int, is_done: bool) -> None:
             (1 if is_done else 0, int(task_id)),
         )
         con.commit()
+
+
+# ===== Tech cards =====
+
+def add_card(name: str, process_id: int, target_type: int, photo_file_id: str | None = None) -> int:
+    """
+    Create new tech card and return its id.
+    """
+    clean_name = name.strip()
+    if not clean_name:
+        raise ValueError("Card name cannot be empty")
+
+    with connect() as con:
+        cur = con.execute(
+            """
+            INSERT INTO tech_cards (name, photo_file_id, process_id, target_type)
+            VALUES (?, ?, ?, ?)
+            """,
+            (clean_name, photo_file_id, int(process_id), int(target_type)),
+        )
+        con.commit()
+        return int(cur.lastrowid)
+
+
+def list_tech_cards(process_id: int, target_type: int) -> List[Tuple[int, str, Optional[str]]]:
+    """
+    List cards for a given process + type.
+    Returns: (id, name, photo_file_id)
+    """
+    with connect() as con:
+        cur = con.execute(
+            """
+            SELECT id, name, photo_file_id
+            FROM tech_cards
+            WHERE process_id=? AND target_type=?
+            ORDER BY id ASC
+            """,
+            (int(process_id), int(target_type)),
+        )
+        return cur.fetchall()
+
+
+def get_card(card_id: int):
+    """
+    Get full card row by id.
+    Returns: (id, name, photo_file_id, process_id, target_type) or None
+    """
+    with connect() as con:
+        cur = con.execute(
+            """
+            SELECT id, name, photo_file_id, process_id, target_type
+            FROM tech_cards
+            WHERE id=?
+            """,
+            (int(card_id),),
+        )
+        return cur.fetchone()
+
+
+def update_card_name(card_id: int, new_name: str) -> None:
+    clean_name = new_name.strip()
+    if not clean_name:
+        raise ValueError("Card name cannot be empty")
+
+    with connect() as con:
+        con.execute(
+            "UPDATE tech_cards SET name=? WHERE id=?",
+            (clean_name, int(card_id)),
+        )
+        con.commit()
+
+
+def update_card_photo(card_id: int, new_photo_file_id: str | None) -> None:
+    """
+    Update photo_file_id. Pass None to remove photo.
+    """
+    with connect() as con:
+        con.execute(
+            "UPDATE tech_cards SET photo_file_id=? WHERE id=?",
+            (new_photo_file_id, int(card_id)),
+        )
+        con.commit()
+
+
+def delete_card(card_id: int) -> None:
+    with connect() as con:
+        con.execute("DELETE FROM tech_cards WHERE id=?", (int(card_id),))
+        con.commit()

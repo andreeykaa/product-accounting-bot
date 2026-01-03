@@ -2,9 +2,11 @@ from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from app.config import PROCESSES, TARGETS_CARD
+from app.handlers.conversations.common import cleanup_last_tech_photo, cleanup_last_tech_photo_by_chat
 from app.storage import db
 from app.bot_ui.keyboards import categories_keyboard, products_keyboard, product_view_keyboard, tasks_cat_keyboard, \
-    tasks_keyboard, task_view_keyboard, tech_cards_cat_keyboard, tech_cards_type_keyboard, tech_cards_keyboard
+    tasks_keyboard, task_view_keyboard, tech_cards_cat_keyboard, tech_cards_type_keyboard, tech_cards_keyboard, \
+    tech_card_view_keyboard
 from telegram import CallbackQuery
 
 
@@ -289,8 +291,7 @@ async def render_tech_cards_type_edit(query, context: ContextTypes.DEFAULT_TYPE,
 async def send_tech_cards_reply(message, context: ContextTypes.DEFAULT_TYPE, tech_card_cat_id, tech_card_type_id) -> None:
     card_cat = PROCESSES[tech_card_cat_id]['name']
     card_type = TARGETS_CARD[tech_card_type_id]['name']
-    # card_rows = db.get_list_tech_cards(tech_card_cat_id, tech_card_type_id)
-    card_rows = []
+    card_rows = db.list_tech_cards(tech_card_cat_id, tech_card_type_id)
 
     type_emoji = "🍽" if TARGETS_CARD[tech_card_type_id]["key"] == "dish" else "🥣"
     if card_rows:
@@ -304,8 +305,7 @@ async def send_tech_cards_reply(message, context: ContextTypes.DEFAULT_TYPE, tec
 async def render_tech_cards_edit(query, context: ContextTypes.DEFAULT_TYPE, tech_card_cat_id, tech_card_type_id) -> None:
     card_cat = PROCESSES[tech_card_cat_id]['name']
     card_type = TARGETS_CARD[tech_card_type_id]['name']
-    # card_rows = db.get_list_tech_cards(tech_card_cat_id, tech_card_type_id)
-    card_rows = []
+    card_rows = db.list_tech_cards(tech_card_cat_id, tech_card_type_id)
 
     type_emoji = "🍽" if TARGETS_CARD[tech_card_type_id]["key"] == "dish" else "🥣"
     if card_rows:
@@ -318,3 +318,76 @@ async def render_tech_cards_edit(query, context: ContextTypes.DEFAULT_TYPE, tech
         text,
         reply_markup=tech_cards_keyboard(tech_card_cat_id, tech_card_type_id, card_rows)
     )
+
+
+async def send_tech_card_reply(message, context: ContextTypes.DEFAULT_TYPE, card_id: int) -> None:
+    """
+    Send a single tech card screen as a new message.
+    Behavior:
+    - Loads tech card by id
+    - Sends a new message with text + inline keyboard
+    - Deletes previously shown tech photo (if any)
+    - Sends photo (if exists) and stores its message_id for later deletion
+    """
+    card = db.get_card(card_id)
+    if not card:
+        await message.reply_text("Тех-карту не знайдено.")
+        return
+
+    _, name, photo_file_id, process_id, target_type = card
+    card_cat = PROCESSES[process_id]['name']
+    card_type = TARGETS_CARD[target_type]['name']
+    type_emoji = "🍽" if TARGETS_CARD[target_type]["key"] == "dish" else "🥣"
+
+    header = f"🗂 Технічні карти\n{card_cat} · {type_emoji} {card_type}"
+    text = header + f"\n\nТех-карта: {name}"
+
+    await cleanup_last_tech_photo_by_chat(context, message.chat.id)
+
+    screen_msg = await message.reply_text(
+        text,
+        reply_markup=tech_card_view_keyboard(card_id, target_type),
+    )
+
+    context.user_data["tech_card_screen_chat_id"] = screen_msg.chat.id
+    context.user_data["tech_card_screen_message_id"] = screen_msg.message_id
+    context.user_data["active_tech_card_id"] = card_id
+
+    if photo_file_id:
+        msg = await message.reply_photo(photo=photo_file_id)
+        context.user_data["last_tech_photo_card_id"] = card_id
+        context.user_data["last_tech_photo_msg_id"] = msg.message_id
+
+
+async def render_tech_card_edit(query, context: ContextTypes.DEFAULT_TYPE, card_id: int) -> None:
+    """
+    Render (update) a single tech card screen by editing the current inline message.
+
+    Behavior:
+    - Loads tech card by id
+    - Edits the current message with text + inline keyboard
+    """
+    card = db.get_card(card_id)
+    if not card:
+        await query.answer("Тех-карту не знайдено.", show_alert=True)
+        return
+
+    _, name, photo_file_id, process_id, target_type = card
+    card_cat = PROCESSES[process_id]['name']
+    card_type = TARGETS_CARD[target_type]['name']
+    type_emoji = "🍽" if TARGETS_CARD[target_type]["key"] == "dish" else "🥣"
+
+    header = f"🗂 Технічні карти\n{card_cat} · {type_emoji} {card_type}"
+    text = header + f"\n\nТех-карта: {name}"
+
+    await safe_edit_message(
+        query,
+        text,
+        reply_markup=tech_card_view_keyboard(card_id, target_type),
+    )
+
+    await cleanup_last_tech_photo(query, context)
+    if photo_file_id:
+        msg = await query.message.reply_photo(photo=photo_file_id)
+        context.user_data["last_tech_photo_card_id"] = card_id
+        context.user_data["last_tech_photo_msg_id"] = msg.message_id

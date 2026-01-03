@@ -104,7 +104,7 @@ async def task_edit_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def register_task_conversations(app: Application) -> None:
     """
-    Register ConversationHandlers for category flows.
+    Register ConversationHandlers for tasks flows.
     """
     app.add_handler(ConversationHandler(
         entry_points=[CallbackQueryHandler(task_add_from_button, pattern=r"^task_proc:add:\d+$"),],
