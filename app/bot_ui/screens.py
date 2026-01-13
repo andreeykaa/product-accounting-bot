@@ -125,10 +125,16 @@ async def render_product_edit(query, context: ContextTypes.DEFAULT_TYPE, prod_id
     prod_id, cat_id, name, qty, limit_qty, below_limit = row
     text = f"🏷️ Продукт: {name}"
 
+    from_search = bool(context.user_data.get("search_return_enabled"))
+
+    back_cb = "sr:results" if from_search else None
+    back_text = "⬅️ Назад до результатів пошуку" if from_search else None
+
     await safe_edit_message(
         query,
         text,
-        reply_markup=product_view_keyboard(prod_id, cat_id, qty, limit_qty),
+        reply_markup=product_view_keyboard(prod_id=prod_id, cat_id=cat_id, qty=qty, limit_qty=limit_qty,
+                                           back_cb=back_cb, back_text=back_text)
     )
 
 
@@ -152,9 +158,15 @@ async def send_product_reply(message, context: ContextTypes.DEFAULT_TYPE, prod_i
     prod_id, cat_id, name, qty, limit_qty, below_limit = row
     text = f"🏷️ Продукт: {name}"
 
+    from_search = bool(context.user_data.get("search_return_enabled"))
+
+    back_cb = "sr:results" if from_search else None
+    back_text = "⬅️ Назад до результатів пошуку" if from_search else None
+
     await message.reply_text(
         text,
-        reply_markup=product_view_keyboard(prod_id, cat_id, qty, limit_qty),
+        reply_markup=product_view_keyboard(prod_id=prod_id, cat_id=cat_id, qty=qty, limit_qty=limit_qty,
+                                           back_cb=back_cb, back_text=back_text)
     )
 
 
@@ -344,9 +356,14 @@ async def send_tech_card_reply(message, context: ContextTypes.DEFAULT_TYPE, card
 
     await cleanup_last_tech_photo_by_chat(context, message.chat.id)
 
+    from_search = bool(context.user_data.get("search_return_enabled"))
+
+    back_cb = "sr:results" if from_search else None
+    back_text = "⬅️ Назад до результатів пошуку" if from_search else None
+
     screen_msg = await message.reply_text(
         text,
-        reply_markup=tech_card_view_keyboard(card_id, target_type),
+        reply_markup=tech_card_view_keyboard(card_id, target_type, back_cb=back_cb, back_text=back_text)
     )
 
     context.user_data["tech_card_screen_chat_id"] = screen_msg.chat.id
@@ -380,10 +397,15 @@ async def render_tech_card_edit(query, context: ContextTypes.DEFAULT_TYPE, card_
     header = f"🗂 Технічні карти\n{card_cat} · {type_emoji} {card_type}"
     text = header + f"\n\nТех-карта: {name}"
 
+    from_search = bool(context.user_data.get("search_return_enabled"))
+
+    back_cb = "sr:results" if from_search else None
+    back_text = "⬅️ Назад до результатів пошуку" if from_search else None
+
     await safe_edit_message(
         query,
         text,
-        reply_markup=tech_card_view_keyboard(card_id, target_type),
+        reply_markup=tech_card_view_keyboard(card_id, target_type, back_cb=back_cb, back_text=back_text)
     )
 
     await cleanup_last_tech_photo(query, context)

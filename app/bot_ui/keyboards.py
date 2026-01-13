@@ -20,7 +20,8 @@ def bottom_kb(chat_id: int) -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton("🏠 Категорії"), KeyboardButton("📝 Список завдань")],
             [KeyboardButton("📝 Дозамовити"), KeyboardButton("📝 Тех-карти")],
-            [KeyboardButton("🔄 Оновити дані"), sub_btn]
+            [KeyboardButton("🔄 Оновити дані"), KeyboardButton("🔍 Швидкий пошук")],
+            [sub_btn]
         ],
         resize_keyboard=True,
     )
@@ -69,12 +70,21 @@ def products_keyboard(cat_id: int, products_rows):
     return InlineKeyboardMarkup(kb)
 
 
-def product_view_keyboard(prod_id: int, cat_id: int, qty: float, limit_qty: float | None):
+def product_view_keyboard(prod_id: int, cat_id: int, qty: float, limit_qty: float | None,
+                          back_cb: str | None = None, back_text: str | None = None):
     """
     Inline keyboard for a single product screen.
     Shows product actions + qty/limit controls.
     """
     limit_text = "—" if limit_qty is None else str(limit_qty)
+
+    back_btn = InlineKeyboardButton(
+        back_text or "⬅️ Назад до пошуку",
+        callback_data=back_cb
+    ) if back_cb else InlineKeyboardButton(
+        "⬅️ Назад до категорії",
+        callback_data=f"cat:open:{cat_id}"
+    )
 
     return InlineKeyboardMarkup([
         [
@@ -85,7 +95,7 @@ def product_view_keyboard(prod_id: int, cat_id: int, qty: float, limit_qty: floa
             InlineKeyboardButton(f"🔢 К-сть: {qty}", callback_data=f"prod:qty:{prod_id}"),
             InlineKeyboardButton(f"⚠️ Мін к-сть: {limit_text}", callback_data=f"prod:limit:{prod_id}"),
         ],
-        [InlineKeyboardButton("⬅️ Назад до категорії", callback_data=f"cat:open:{cat_id}")]
+        [back_btn]
     ])
 
 
@@ -172,11 +182,18 @@ def tech_cards_keyboard(card_cat_id: int, card_type_id: int, card_rows):
     return InlineKeyboardMarkup(kb)
 
 
-def tech_card_view_keyboard(card_id, target_type):
+def tech_card_view_keyboard(card_id, target_type, back_cb: str | None = None, back_text: str | None = None):
     """
     Inline keyboard for a single tech card screen.
     Shows tech card actions.
     """
+    back_btn = InlineKeyboardButton(
+        back_text or "⬅️ Назад",
+        callback_data=back_cb
+    ) if back_cb else InlineKeyboardButton(
+        "⬅️ Назад до списку тех-карт",
+        callback_data="tech_card:back"
+    )
 
     return InlineKeyboardMarkup([
         [
@@ -186,7 +203,7 @@ def tech_card_view_keyboard(card_id, target_type):
         [
             InlineKeyboardButton("🗑️ Видалити", callback_data=f"tech_card:del:{card_id}"),
         ],
-        [InlineKeyboardButton("⬅️ Назад до списку тех-карт", callback_data="tech_card:back")]
+        [back_btn]
     ])
 
 

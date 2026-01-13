@@ -1,12 +1,23 @@
+import re
 import sqlite3
 from typing import Optional, List, Tuple
 import os
 from pathlib import Path
+from typing import Dict, Any
+
+try:
+    from rapidfuzz import fuzz as _rf_fuzz
+except ImportError:
+    _rf_fuzz = None
+    from difflib import SequenceMatcher
+
 
 DB_PATH = os.getenv("DB_PATH", "data/bot.db")
 db_file = Path(DB_PATH)
 if db_file.parent and str(db_file.parent) not in (".", ""):
     db_file.parent.mkdir(parents=True, exist_ok=True)
+
+_WORD_RE = re.compile(r"\w+", re.UNICODE)
 
 
 def connect() -> sqlite3.Connection:
@@ -15,7 +26,53 @@ def connect() -> sqlite3.Connection:
     """
     con = sqlite3.connect(DB_PATH)
     con.execute("PRAGMA foreign_keys = ON;")
+    con.row_factory = sqlite3.Row
     return con
+
+
+def _normalize_query(q: str) -> str:
+    return " ".join((q or "").strip().split())
+
+
+def _fts_query(q: str) -> str:
+    # "salma piza" -> "salma* piza*"
+    words = [w for w in _normalize_query(q).split(" ") if w]
+    return " ".join(w + "*" for w in words)
+
+
+def _fuzzy_score(a: str, b: str) -> int:
+    a = a or ""
+    b = b or ""
+    if _rf_fuzz is not None:
+        # robust to word order, duplicates, etc.
+        return int(_rf_fuzz.token_set_ratio(a, b))
+    # fallback if rapidfuzz not installed
+    return int(SequenceMatcher(None, a, b).ratio() * 100)
+
+
+def _rebuild_search_index_in_conn(con: sqlite3.Connection) -> None:
+    """
+    Internal rebuild using existing connection (to reuse transaction).
+    """
+    con.execute("DELETE FROM search_index")
+
+    # products: name + category name
+    con.execute("""
+        INSERT INTO search_index(entity_type, entity_id, title, content)
+        SELECT 'product', p.id, p.name,
+               p.name || ' ' || IFNULL(c.name,'')
+        FROM products p
+        LEFT JOIN categories c ON c.id = p.category_id
+    """)
+
+    # tech_cards: name
+    con.execute("""
+        INSERT INTO search_index(entity_type, entity_id, title, content)
+        SELECT 'tech_card', id, name, name
+        FROM tech_cards
+    """)
+
+    con.commit()
 
 
 def init_db() -> None:
@@ -77,6 +134,112 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_tech_cards_process_target
             ON tech_cards(process_id, target_type)
         """)
+
+        # ==========================================================
+        # 🔍 SEARCH INDEX (FTS5) + TRIGGERS
+        # ==========================================================
+
+        # FTS5 index for fast global search
+        con.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
+                entity_type,
+                entity_id UNINDEXED,
+                title,
+                content,
+                tokenize = 'unicode61'
+            )
+        """)
+
+        # Triggers keep search_index always актуальним.
+        # We index:
+        # - products: name + category name
+        # - tech_cards: name
+
+        con.executescript("""
+        -- ----------------------------
+        -- PRODUCTS -> search_index
+        -- ----------------------------
+        CREATE TRIGGER IF NOT EXISTS trg_products_ai
+        AFTER INSERT ON products
+        BEGIN
+            INSERT INTO search_index(entity_type, entity_id, title, content)
+            SELECT 'product', NEW.id, NEW.name,
+                   NEW.name || ' ' || IFNULL(c.name,'')
+            FROM categories c
+            WHERE c.id = NEW.category_id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_products_au
+        AFTER UPDATE OF name, category_id ON products
+        BEGIN
+            DELETE FROM search_index
+            WHERE entity_type='product' AND entity_id=OLD.id;
+
+            INSERT INTO search_index(entity_type, entity_id, title, content)
+            SELECT 'product', NEW.id, NEW.name,
+                   NEW.name || ' ' || IFNULL(c.name,'')
+            FROM categories c
+            WHERE c.id = NEW.category_id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_products_ad
+        AFTER DELETE ON products
+        BEGIN
+            DELETE FROM search_index
+            WHERE entity_type='product' AND entity_id=OLD.id;
+        END;
+
+        -- ----------------------------
+        -- TECH_CARDS -> search_index
+        -- ----------------------------
+        CREATE TRIGGER IF NOT EXISTS trg_tech_cards_ai
+        AFTER INSERT ON tech_cards
+        BEGIN
+            INSERT INTO search_index(entity_type, entity_id, title, content)
+            VALUES ('tech_card', NEW.id, NEW.name, NEW.name);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_tech_cards_au
+        AFTER UPDATE OF name ON tech_cards
+        BEGIN
+            DELETE FROM search_index
+            WHERE entity_type='tech_card' AND entity_id=OLD.id;
+
+            INSERT INTO search_index(entity_type, entity_id, title, content)
+            VALUES ('tech_card', NEW.id, NEW.name, NEW.name);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_tech_cards_ad
+        AFTER DELETE ON tech_cards
+        BEGIN
+            DELETE FROM search_index
+            WHERE entity_type='tech_card' AND entity_id=OLD.id;
+        END;
+
+        -- ----------------------------
+        -- If category name changes -> update all products in that category inside index
+        -- ----------------------------
+        CREATE TRIGGER IF NOT EXISTS trg_categories_au
+        AFTER UPDATE OF name ON categories
+        BEGIN
+            DELETE FROM search_index
+            WHERE entity_type='product'
+              AND entity_id IN (SELECT id FROM products WHERE category_id=NEW.id);
+
+            INSERT INTO search_index(entity_type, entity_id, title, content)
+            SELECT 'product', p.id, p.name,
+                   p.name || ' ' || IFNULL(NEW.name,'')
+            FROM products p
+            WHERE p.category_id = NEW.id;
+        END;
+
+        -- If category deleted -> products deleted by FK cascade; product delete trigger will clean index.
+        """)
+
+        # If index is empty (first run), fill it once
+        cur = con.execute("SELECT COUNT(*) FROM search_index")
+        if cur.fetchone()[0] == 0:
+            _rebuild_search_index_in_conn(con)
 
         # Simple migrations for older DBs
         cols = [row[1] for row in con.execute("PRAGMA table_info(products)").fetchall()]
@@ -413,3 +576,93 @@ def delete_card(card_id: int) -> None:
     with connect() as con:
         con.execute("DELETE FROM tech_cards WHERE id=?", (int(card_id),))
         con.commit()
+
+
+def rebuild_search_index() -> None:
+    """
+    Public: full rebuild (for your 🔄 button or after bulk imports).
+    """
+    with connect() as con:
+        _rebuild_search_index_in_conn(con)
+
+
+def _tokens(s: str) -> list[str]:
+    return _WORD_RE.findall((s or "").lower())
+
+
+def _root(word: str) -> str:
+    w = (word or "").lower().strip()
+    if len(w) >= 4:
+        return w[:4]
+    return w
+
+
+def quick_search(query: str, *, fts_limit: int = 200, out_limit: int = 20, min_score: int = 60) -> List[Dict[str, Any]]:
+    q = _normalize_query(query)
+    if len(q) < 2:
+        return []
+
+    q_low = q.lower()
+    q_words = _tokens(q_low)
+    roots = [r for r in (_root(w) for w in q_words) if r]
+
+    fts_q = _fts_query(q)
+
+    with connect() as con:
+        con.row_factory = sqlite3.Row
+
+        # --- 1) FTS candidates ---
+        fts_rows = con.execute("""
+            SELECT entity_type, entity_id, title, content
+            FROM search_index
+            WHERE search_index MATCH ?
+            LIMIT ?
+        """, (fts_q, int(fts_limit))).fetchall()
+
+        # --- 2) Root candidates ---
+        root_rows = []
+        if roots:
+            where = " OR ".join(["lower(content) LIKE ?"] * len(roots))
+            params = [f"%{r}%" for r in roots]
+            root_rows = con.execute(f"""
+                SELECT entity_type, entity_id, title, content
+                FROM search_index
+                WHERE {where}
+                LIMIT ?
+            """, (*params, int(fts_limit))).fetchall()
+
+    # --- merge unique candidates ---
+    seen = set()
+    candidates = []
+    for row in list(fts_rows) + list(root_rows):
+        key = (row["entity_type"], int(row["entity_id"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(row)
+
+    scored: List[Dict[str, Any]] = []
+
+    for row in candidates:
+        title = row["title"] or ""
+        content = row["content"] or ""
+        hay = (title + " " + content).lower()
+
+        root_hit = any(r in hay for r in roots)
+
+        if root_hit:
+            score = 95
+        else:
+            score = _fuzzy_score(q, content)
+            if score < min_score:
+                continue
+
+        scored.append({
+            "score": int(score),
+            "type": row["entity_type"],
+            "id": int(row["entity_id"]),
+            "title": title,
+        })
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    return scored[:out_limit]

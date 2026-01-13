@@ -1,6 +1,27 @@
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
+ACTIVE_KEYS = (
+    "active_cat_id",
+    "active_prod_id",
+    "active_task_id",
+    "active_tc_id",
+    "active_tech_card_cat_id",
+    "active_tech_card_type_id",
+    "active_tech_card_id",
+)
+
+
+def reset_active_context(user_data: dict) -> None:
+    for k in ACTIVE_KEYS:
+        user_data.pop(k, None)
+
+
+def reset_search_context(user_data: dict) -> None:
+    user_data.pop("search_return_enabled", None)
+    user_data.pop("search_last_results", None)
+    user_data.pop("search_last_query", None)
+
 
 async def on_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """

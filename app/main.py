@@ -9,6 +9,7 @@ from app.handlers.bottom_menu import register_bottom_menu_handlers
 from app.handlers.callbacks import register_callback_handlers
 from app.handlers.conversations.categories import register_category_conversations
 from app.handlers.conversations.products import register_product_conversations
+from app.handlers.conversations.search import register_search_conversations
 
 
 def main() -> None:
@@ -26,6 +27,7 @@ def main() -> None:
     register_product_conversations(app)
     register_task_conversations(app)
     register_tech_card_conversations(app)
+    register_search_conversations(app)
     register_callback_handlers(app)
 
     app.run_polling()
